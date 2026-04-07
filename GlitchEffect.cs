@@ -1,32 +1,54 @@
 using UnityEngine;
 
 /// <summary>
-/// Creates a visual 3D glitch effect by spawning procedural objects.
+/// Creates a 3D visual glitch effect by procedurally spawning and destroying blocks.
+/// This script works across all Unity render pipelines (Built-in, URP, HDRP).
 /// </summary>
 public class GlitchEffect : MonoBehaviour
 {
-    private float _timer; // Internal pulse tracker
+    private float _timer; // Internal counter to track time between each spawn
 
     [Header("Glitch Settings")]
-    [Tooltip("How often a new glitch block appears (in seconds)")]
+    [Tooltip("Delay between spawns. Lower values = more intense glitch effect.")]
     [SerializeField] private float glitchIntensity = 0.1f;
 
-    [Tooltip("The prefab used as a glitch particle (e.g., a simple cube)")]
+    [Tooltip("Base scale factor. If set to 0, the script will auto-detect the object's size.")]
+    [SerializeField] private float size;
+
+    [Tooltip("The radius around the object where glitch blocks can appear.")]
+    [SerializeField] private float spawnRadius = 0.5f;
+
+    [Tooltip("The 3D model (e.g., a Cube) that will appear as a glitch particle.")]
     [SerializeField] public GameObject cubePrefab;
 
-    [Tooltip("Array of colors that will be randomly assigned to glitch blocks")]
+    [Tooltip("List of colors that will be randomly assigned to the glitch blocks.")]
     [SerializeField] private Color[] glitchColors = { Color.cyan, Color.magenta, Color.yellow, Color.green, Color.black };
+
+    void Start()
+    {
+        // Auto-calculate size if not manually set in the Inspector
+        if (size <= 0)
+        {
+            Renderer rend = GetComponent<Renderer>();
+            if (rend != null)
+            {
+                size = rend.bounds.size.magnitude;
+            }
+            else
+            {
+                size = 1f; // Fallback to 1 if no renderer is found
+            }
+        }
+    }
 
     void Update()
     {
-        // Accumulate time since the last frame
         _timer += Time.deltaTime;
 
-        // Check if it's time to spawn a new glitch element
         if (_timer > glitchIntensity)
         {
             SpawnGlitchBlock();
-            _timer = 0f; // Reset timer for the next cycle
+            _timer = 0f; // Reset the cycle
         }
     }
 
@@ -34,28 +56,32 @@ public class GlitchEffect : MonoBehaviour
     {
         if (cubePrefab == null) return;
 
-        // Generate a random spawn position within a small sphere around the object
-        Vector3 randomPos = transform.position + Random.insideUnitSphere * 0.5f;
+        // Calculate a random spawn point within a radius based on the 'size' variable
+        Vector3 randomPos = transform.position + Random.insideUnitSphere * spawnRadius;
 
-        // Instantiate the glitch block
+        // Create the glitch block at the calculated position
         GameObject newBlock = Instantiate(cubePrefab, randomPos, Quaternion.identity);
 
-        // Randomize scale to create a "digital noise" look
+        // Optional: Make blocks follow the parent object's movement
+        // newBlock.transform.SetParent(this.transform);
+
+        // Adjust block scale relative to the object's size to keep the effect proportional
+        float sizeFactor = size * 0.15f;
         newBlock.transform.localScale = new Vector3(
-            Random.Range(0.2f, 1.2f),
-            Random.Range(0.1f, 0.5f),
-            Random.Range(0.2f, 1.2f)
+            Random.Range(0.2f, 1.2f) * sizeFactor,
+            Random.Range(0.1f, 0.5f) * sizeFactor,
+            Random.Range(0.2f, 1.2f) * sizeFactor
         );
 
-        // Access the renderer to apply a random glitch color
+        // Apply a random color from the glitchColors array to the material
         Renderer blockRenderer = newBlock.GetComponent<Renderer>();
         if (blockRenderer != null)
         {
-            // Pick a random color from the defined array
+            // Note: blockRenderer.material.color creates a unique material instance per block
             blockRenderer.material.color = glitchColors[Random.Range(0, glitchColors.Length)];
         }
 
-        // Destroy the block quickly to simulate flickering and optimize memory
+        // Destroy the block quickly to simulate high-frequency digital flickering
         Destroy(newBlock, 0.15f);
     }
 }
